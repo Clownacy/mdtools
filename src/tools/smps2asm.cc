@@ -1042,10 +1042,10 @@ static void usage() {
          << "\t             \tSMPS type. {version} can be '1' Sonic 1, '2' for "
             "Sonic 2 or"
          << endl
-         << "\t             \t'3' for Sonic 3, '4' for Sonic & Knuckles, or "
-            "'5' for Sonic"
+         << "\t             \t'3' for Sonic 3, '4' for Sonic & Knuckles, '5' "
+            "for Sonic 3D"
          << endl
-         << "\t             \t3D Blast." << endl;
+         << "\t             \tBlast, or '6' for Sonic 2 (8-bit)." << endl;
     cerr << "\t-3,--s3kmode \tThis flag is valid for Sonic 1 and Sonic 2 only; "
             "this will"
          << endl
