@@ -299,8 +299,45 @@ static void print_dac_sample(ostream& out, int val, int sonicver, bool flag) {
             "dIntroKick"sv,
             "dFinalFightMetalCrash"sv};
 
+    constexpr const static array s28bitdaclut{
+            "nRst"sv,
+            "dNoise1"sv,
+            "dNoise2"sv,
+            "dNoise1"sv,
+            "dNoise3"sv,
+            "dNoise1"sv,
+            "dNoise2"sv,
+            "dNoise1"sv,
+            "dNoise4"sv,
+            "dNoise1"sv,
+            "dNoise2"sv,
+            "dNoise1"sv,
+            "dNoise3"sv,
+            "dNoise1"sv,
+            "dNoise2"sv,
+            "dNoise1"sv,
+            "dNoise5"sv,
+            "dNoise1"sv,
+            "dNoise2"sv,
+            "dNoise1"sv,
+            "dNoise3"sv,
+            "dNoise1"sv,
+            "dNoise2"sv,
+            "dNoise1"sv,
+            "dNoise4"sv,
+            "dNoise1"sv,
+            "dNoise2"sv,
+            "dNoise1"sv,
+            "dNoise3"sv,
+            "dNoise1"sv,
+            "dNoise2"sv,
+            "dNoise1"sv,
+            "dNoise6"sv};
+
     size_t note = val - 0x80;
-    if (sonicver == 5 && note < s3ddaclut.size()) {
+    if (sonicver == 6 && note < s28bitdaclut.size()) {
+        PrintName(out, s28bitdaclut[note], flag);
+    } else if (sonicver == 5 && note < s3ddaclut.size()) {
         PrintName(out, s3ddaclut[note], flag);
     } else if (sonicver == 4 && note < skdaclut.size()) {
         PrintName(out, skdaclut[note], flag);
@@ -437,7 +474,16 @@ void CoordFlagNoParams<noret>::print(
     ignore_unused_variable_warning(tracktype, labels, s3kmode);
     // Note-like macros:
     const auto [s, notelike] = [&]() -> pair<string_view, bool> {
-        if (sonicver >= 3) {
+        if (sonicver == 6) {
+            switch (get_value()) {
+            case 0xe7:
+                return {"smpsNoAttack"sv, true};
+            case 0xf2:
+                return {"smpsStop"sv, false};
+            case 0xf9:
+                return {"smpsReturn"sv, false};
+            }
+        } else if (sonicver >= 3) {
             switch (get_value()) {
             case 0xe2:
                 return {"smpsFade"sv, false};    // For $E2, $FF
@@ -519,7 +565,9 @@ void BaseNote::print_psg_tone(ostream& out, int tone, int sonicver, bool last) {
         return;
     }
 
-    if (sonicver >= 3) {
+    if (sonicver == 6) {
+        out << "s28BitTone_";
+    } else if (sonicver >= 3) {
         out << "sTone_";
     } else {
         out << "fTone_";
@@ -545,7 +593,35 @@ void CoordFlag1ParamByte<noret>::print(
     need_rest    = true;
 
     const auto [s, metacf] = [&]() -> pair<string_view, bool> {
-        if (sonicver >= 3) {
+        if (sonicver == 6) {
+            switch (get_value()) {
+            case 0xe1:
+                return {"smpsDetune"sv, false};
+            case 0xe2:
+            case 0xe6:
+                return {"smpsPSGAlterVol"sv, false};
+            case 0xe4:
+                return {"smpsPSGDrumAlterVol"sv, false};
+            case 0xe5:
+                return {"smpsADSRMode"sv, false};
+            case 0xe8:
+                return {"smpsNoteFill"sv, false};
+            case 0xed:
+                return {"smpsSetTempoMod"sv, false};
+            case 0xf3:
+                return {"smpsPSGform"sv, false};
+            case 0xf4:
+                return {"smpsModChange"sv, false};
+            case 0xf5:
+                return {"smpsPSGvoice"sv, false};
+            case 0xfa:
+                return {"smpsChanTempoDiv"sv, false};
+            case 0xfb:
+                return {"smpsChangeTransposition"sv, false};
+            case 0xfd:
+                return {"smpsAlternameSMPS"sv, false};
+            }
+        } else if (sonicver >= 3) {
             switch (get_value()) {
             case 0xe0:
                 return {"smpsPan"sv, false};
@@ -779,7 +855,12 @@ void CoordFlag4ParamBytes<noret>::print(
     need_rest    = true;
 
     const auto [s, metacf] = [&]() -> pair<string_view, bool> {
-        if (sonicver >= 3) {
+        if (sonicver == 6) {
+            switch (get_value()) {
+            case 0xf0:
+                return {"smpsModSet"sv, false};
+            }
+        } else if (sonicver >= 3) {
             switch (get_value()) {
             case 0xf0:
                 return {"smpsModSet"sv, false};
@@ -824,7 +905,12 @@ void CoordFlag5ParamBytes<noret>::print(
     need_rest    = true;
 
     const auto [s, metacf] = [&]() -> pair<string_view, bool> {
-        if (sonicver >= 3) {
+        if (sonicver == 6) {
+            switch (get_value()) {
+            case 0xe0:
+                return {"smpsADSRMode"sv, true};
+            }
+        } else if (sonicver >= 3) {
             switch (get_value()) {
             case 0xff:
                 switch (param1) {
@@ -927,7 +1013,12 @@ void CoordFlagPointer2ParamBytes<noret>::print(
     need_rest    = true;
 
     const auto [s, metacf] = [&]() -> pair<string_view, bool> {
-        if (sonicver >= 3) {
+        if (sonicver == 6) {
+            switch (get_value()) {
+            case 0xf7:
+                return {"smpsLoop"sv, false};
+            }
+        } else if (sonicver >= 3) {
             switch (get_value()) {
             case 0xf7:
                 return {"smpsLoop"sv, false};

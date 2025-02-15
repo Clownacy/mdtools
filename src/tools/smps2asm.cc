@@ -201,7 +201,71 @@ BaseNote* BaseNote::read(
         }
     }
 
-    if (sonicver >= 3) {
+    if (sonicver == 6) {
+        switch (byte) {
+        case 0xe0:
+            return new CoordFlag5ParamBytes<false>(
+                    byte, keydisp, Read1(in), Read1(in), Read1(in), Read1(in),
+                    Read1(in));
+        case 0xe1:
+        case 0xe2:
+        case 0xe4:
+        case 0xe5:
+        case 0xe6:
+        case 0xe8:
+        case 0xed:
+        case 0xf3:
+        case 0xf4:
+        case 0xf5:
+        case 0xfa:
+        case 0xfb:
+        case 0xfd:
+            return new CoordFlag1ParamByte<false>(byte, keydisp, Read1(in));
+        case 0xe7:
+            return new CoordFlagNoParams<false>(byte, keydisp);
+        case 0xf0:
+            return new CoordFlag4ParamBytes<false>(
+                    byte, keydisp, Read1(in), Read1(in), Read1(in), Read1(in));
+        case 0xf2:
+        case 0xf9:
+            return new CoordFlagNoParams<true>(byte, keydisp);
+        case 0xf6:      // Jump
+        case 0xf8: {    // Call
+            int  ptr = IO::read_pointer(in, offset);
+            auto it  = labels.find(ptr);
+            if (it == labels.end()) {
+                string lbl;
+                if (byte == 0xf6) {
+                    lbl = need_jump_label();
+                } else {
+                    lbl = need_call_label();
+                }
+                labels.emplace(ptr, projname + lbl);
+            }
+            if (byte == 0xf6) {
+                return new CoordFlagPointerParam<true>(byte, keydisp, ptr);
+            }
+            return new CoordFlagPointerParam<false>(byte, keydisp, ptr);
+        }
+        case 0xf7: {    // Loop
+            uint8_t index   = Read1(in);
+            uint8_t repeats = Read1(in);
+            int     ptr     = IO::read_pointer(in, offset);
+            auto    it      = labels.find(ptr);
+            if (it == labels.end()) {
+                labels.emplace(ptr, projname + need_loop_label());
+            }
+            return new CoordFlagPointer2ParamBytes<false>(
+                    byte, keydisp, index, repeats, ptr);
+        }
+        default:
+            cerr << "Invalid coordination flag '";
+            PrintHex2(cerr, byte, false);
+            cerr << "' found at offset " << size_t(in.tellg()) - 1
+                 << "; it will be ignored." << endl;
+            return new NullNote();
+        }
+    } else if (sonicver >= 3) {
         switch (byte) {
         case 0xff: {    // Meta
             uint8_t spec = Read1(in);
@@ -459,7 +523,7 @@ public:
         // Start with music conversion header.
         out << projname << "_Header:" << endl;
         PrintMacro(out, "smpsHeaderStartSong");
-        out << (sonicver > 3 ? 3 : sonicver) << ", " << SMPS2ASM_VERSION
+        out << (sonicver == 6 ? 1 : sonicver > 3 ? 3 : sonicver) << ", " << SMPS2ASM_VERSION
             << endl;
 
         // Now for voice pointer; this is the first piece of data in both
@@ -467,10 +531,10 @@ public:
         int  vocptr = IO::Read2(in);
         bool ext_vocs;
         // Also using a hack for null pointer here.
-        bool uses_uvb = (sonicver >= 3 && vocptr == 0x17d8) || (vocptr == 0);
+        bool uses_uvb = (sonicver >= 3 && sonicver <= 5 && vocptr == 0x17d8) || (vocptr == 0);
         int  last_voc = -1;
 
-        if (vocptr == 0) {
+        if (vocptr == 0 || sonicver == 6) {
             // Null voice bank.
             ext_vocs = true;
             out << "\tsmpsHeaderVoiceNull" << endl;
@@ -589,6 +653,12 @@ public:
             // Number of FM+DAC, PSG channels.
             int nfm  = Read1(in);
             int npsg = Read1(in);
+
+            if (sonicver == 6) {
+                npsg = nfm;
+                nfm = 0;
+            }
+
             // Output channel setup header.
             PrintMacro(out, "smpsHeaderChan");
             PrintHex2(out, nfm, false);
@@ -648,10 +718,10 @@ public:
             // Time for PSG channels.
             for (int i = 0; i < npsg; i++) {
                 int    ptr     = IO::read_header_pointer(in, offset);
-                int    keydisp = Read1(in);
+                int    keydisp = sonicver == 6 ? Read1(in) + 1 & 0xFF : Read1(in);
                 int    initvol = Read1(in);
-                int    modctrl = Read1(in);
-                int    tone    = Read1(in);
+                int    modctrl = sonicver == 6 ? 0 : Read1(in);
+                int    tone    = sonicver == 6 ? 0 : Read1(in);
                 string lbl     = projname;
                 auto   c       = static_cast<char>(i + '1');
                 lbl += "_PSG";
@@ -667,7 +737,7 @@ public:
                 out << endl;
 
                 // Add to queue.
-                todo.push(LocTraits(ptr, LocTraits::ePSGInit, keydisp));
+                todo.push(LocTraits(ptr, sonicver == 6 && i == 3 ? LocTraits::eDACInit : LocTraits::ePSGInit, keydisp));
             }
         }
 
@@ -1111,7 +1181,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (argc - optind < 3 || sonicver < 1 || sonicver > 5
+    if (argc - optind < 3 || sonicver < 1 || sonicver > 6
         || (!saxman && pointer != 0 && offset != 0)
         || (bankmode && (pointer != 0 || saxman || sonicver == 1))
         || (s3kmode && sonicver > 2)) {
